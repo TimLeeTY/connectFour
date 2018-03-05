@@ -86,18 +86,24 @@ class agent:
 
     def __init__(self, layer, board):
         layer = np.concatenate(([board.dim[0] * board.dim[1]], layer, [board.dim[0]]))
-        self.w = [np.random.rand(layer[i], layer[i+1])-1 for i in range(len(layer)-1)]
+        self.w = np.array([np.random.rand(layer[i], layer[i+1])*2-1 for i in range(len(layer)-1)])
+        self.findwtot()
+
+    def findwtot(self):
+        self.wtot = self.w[0]
         for i in range(len(self.w)-1):
-            self.w[i+1] = np.dot(self.w[i], self.w[i+1])
+            self.wtot = np.dot(self.wtot, self.w[i+1])
 
     def makeMove(self, board):
-        prob = 1/(1+np.exp(-1*np.dot(board.state.reshape(board.dim[0]*board.dim[1]), self.w[-1])))
+        prob = 1/(1+np.exp(-1*np.dot(board.state.reshape(board.dim[0]*board.dim[1]), self.wtot)))
         prob[np.nonzero(board.state[:, -1])] = 0
         prob = prob/np.sum(prob)
         return(np.random.choice(board.dim[0],  p=prob))
 
-    def mutate(self):
-        return()
+    def mutate(self, prob):
+        for weight in np.nditer(self.w, flags=['refs_ok'], op_flags=['readwrite']):
+            if np.random.rand() < prob:
+                weight *= -1
 
 
 def compete(agents):
@@ -109,16 +115,34 @@ def compete(agents):
     return(ret)
 
 
+def generation(crossFrac, mutateProb, agentProb, agentArr, a):
+    agentPairs = np.random.choice(agentArr, p=agentProb, size=(a, 2))
+    for pair in range(a):
+        [a1, a2] = agentPairs[pair]
+        if a1 != a2:
+            for i in range(len(a1.w)):
+                a1.w[i] = np.array([a1.w[i], a2.w[i]]).mean(axis=0)
+        a1.mutate(mutateProb)
+        a1.findwtot()
+        agentArr[pair] = a1
+        print(agentArr)
+    return(agentArr)
+
+
 board_1 = board()
-a = 100
-agentScore = np.zeros(a)
+a = 20
 agentArr = [agent([8], board_1) for i in range(a)]
-agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
-t0 = time.clock()
-p = mp.Pool(a)
-out = np.array(p.map(compete, agentMat))
-agentScore = out.sum(axis=0) - out.sum(axis=1)
-t1 = time.clock()
+p=mp.Pool(a)
+for gens in range(1000):
+    agentScore = np.zeros(a)
+    agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
+    t0 = time.clock()
+    out = np.array(p.map(compete, agentMat))
+    agentScore = out.sum(axis=0) - out.sum(axis=1)
+    agentProb = 1/(1+np.exp(-1*agentScore))
+    agentProb = agentProb/np.sum(agentProb)
+    agentArr = generation(0.5, 0.01, agentProb, agentArr, a)
+    t1 = time.clock()
 print(t1 - t0)
 print(agentScore, np.sum(agentScore))
 board_1.playHvH()
