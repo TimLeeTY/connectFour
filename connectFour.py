@@ -39,7 +39,7 @@ class board:
     def printState(self):
         for row in np.flip(self.state.T, 0):
             for i in row:
-                print({-1: '🔴  ', 0: ' . ', 1: '🔵  '}[i], end="", flush=True),
+                print({-1: ' x ', 0: ' . ', 1: ' o '}[i], end="", flush=True),
             print('')
 
     def playAvA(self, a1, a2):
@@ -81,6 +81,29 @@ class board:
             print('player %i won' % {1: 1, -1: 2}[self.winner])
         return(self.winner)
 
+    def playHvA(self, a):
+        self.state = np.zeros(self.dim)
+        self.finished = False
+        self.moves = 0
+        self.printState()
+        while not (self.finished) and self.moves < self.dim[0]*self.dim[1]:
+            while not (self.finished):
+                try:
+                    self.move(int(input('player 1\'s select row from 0...%i: ' % self.dim[0])), 1)
+                    self.printState()
+                    break
+                except (NameError, ValueError, IndexError):
+                    print('invalid move, try again')
+            self.move(a.makeMove(self), -1)
+            self.printState()
+        if not self.finished:
+            self.winner = 0
+            print('draw')
+            self.printState()
+        else:
+            print('%s won' % {1: 'player', -1: 'computer'}[self.winner])
+        return(self.winner)
+
 
 class agent:
 
@@ -101,48 +124,54 @@ class agent:
         return(np.random.choice(board.dim[0],  p=prob))
 
     def mutate(self, prob):
-        for weight in np.nditer(self.w, flags=['refs_ok'], op_flags=['readwrite']):
-            if np.random.rand() < prob:
-                weight *= -1
+        for each in range(len(self.w)):
+            temp = self.w[each].flatten()
+            for i in range(len(temp)):
+                if np.random.rand() < prob:
+                    temp[i] = (np.random.rand())
+            self.w[each] = temp.reshape(self.w[each].shape)
+        self.findwtot()
 
 
 def compete(agents):
     ret = np.zeros(len(agents))
     for i in range(len(agents)):
         [a1, a2] = agents[i]
-        if a1 != a2:
-            ret[i] = board_1.playAvA(a1, a2)
+        if not np.array_equal(a1.wtot.sum(), a2.wtot.sum()):
+            for trials in range(3):
+                ret[i] += board_1.playAvA(a1, a2)
     return(ret)
 
 
-def generation(crossFrac, mutateProb, agentProb, agentArr, a):
-    agentPairs = np.random.choice(agentArr, p=agentProb, size=(a, 2))
-    for pair in range(a):
+def generation(mutateProb, scoreSort, agentArr):
+    agentPairs = np.array([[agentArr[scoreSort[i]], agentArr[scoreSort[j]]]
+                           for i in range(len(scoreSort)) for j in range(i)])
+    for pair in range(len(agentPairs)):
         [a1, a2] = agentPairs[pair]
-        if a1 != a2:
+        if not np.array_equal(a1.wtot.sum(), a2.wtot.sum()):
             for i in range(len(a1.w)):
-                a1.w[i] = np.array([a1.w[i], a2.w[i]]).mean(axis=0)
-        a1.mutate(mutateProb)
-        a1.findwtot()
+                a1.w[i] = (a1.w[i] + a2.w[i]) / 2
+                a1.findwtot()
+            a1.mutate(mutateProb)
         agentArr[pair] = a1
-        print(agentArr)
     return(agentArr)
 
 
 board_1 = board()
-a = 20
+a = 45
+t0 = time.clock()
 agentArr = [agent([8], board_1) for i in range(a)]
-p=mp.Pool(a)
-for gens in range(1000):
+p = mp.Pool(a)
+for gens in range(30):
+    mutateProb = 1 / (1+gens)
+    print(gens)
     agentScore = np.zeros(a)
     agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
-    t0 = time.clock()
     out = np.array(p.map(compete, agentMat))
     agentScore = out.sum(axis=0) - out.sum(axis=1)
-    agentProb = 1/(1+np.exp(-1*agentScore))
-    agentProb = agentProb/np.sum(agentProb)
-    agentArr = generation(0.5, 0.01, agentProb, agentArr, a)
-    t1 = time.clock()
+    scoreSort = agentScore.argsort()[-10:][::-1]
+    agentArr = generation(mutateProb, scoreSort, agentArr)
+t1 = time.clock()
 print(t1 - t0)
 print(agentScore, np.sum(agentScore))
-board_1.playHvH()
+board_1.playHvA(agentArr[agentScore.argmax()])
