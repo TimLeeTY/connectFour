@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import multiprocessing as mp
 
 
 class board:
@@ -96,20 +97,27 @@ class agent:
         return(np.random.choice(board.dim[0],  p=prob))
 
     def mutate(self):
+        return()
+
+
+def compete(agents):
+    ret = np.zeros(len(agents))
+    for i in range(len(agents)):
+        [a1, a2] = agents[i]
+        if a1 != a2:
+            ret[i] = board_1.playAvA(a1, a2)
+    return(ret)
 
 
 board_1 = board()
 a = 100
 agentScore = np.zeros(a)
 agentArr = [agent([8], board_1) for i in range(a)]
-
+agentMat = [[[agentArr[i], agentArr[j]] for i in range(a)] for j in range(a)]
 t0 = time.clock()
-for i in range(a):
-    for j in range(a):
-        if j != i:
-            res = board_1.playAvA(agentArr[i], agentArr[j])
-            agentScore[i] += res
-            agentScore[j] -= res
+p = mp.Pool(a)
+out = np.array(p.map(compete, agentMat))
+agentScore = out.sum(axis=0) - out.sum(axis=1)
 t1 = time.clock()
 print(t1 - t0)
 print(agentScore, np.sum(agentScore))
