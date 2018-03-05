@@ -96,6 +96,7 @@ class agent:
         return(np.random.choice(board.dim[0],  p=prob))
 
     def mutate(self):
+        return()
 
 
 board_1 = board()
