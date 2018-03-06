@@ -61,14 +61,14 @@ class board:
         while not (self.finished) and self.moves < self.dim[0]*self.dim[1]:
             while not (self.finished):
                 try:
-                    self.move(int(input('player 1\'s select row from 0...%i: ' % self.dim[0])), 1)
+                    self.move(int(input('player 1\'s turn, select row from 0...%i: ' % (self.dim[0] - 1))), 1)
                     self.printState()
                     break
                 except (NameError, ValueError, IndexError):
                     print('invalid move, try again')
             while not (self.finished):
                 try:
-                    self.move(int(input('player 2\'s select row from 0...%i: ' % self.dim[0])), -1)
+                    self.move(int(input('player 2\'s turn, select row from 0...%i: ' % (self.dim[0] - 1))), -1)
                     self.printState()
                     break
                 except (NameError, ValueError, IndexError):
@@ -89,7 +89,7 @@ class board:
         while not (self.finished) and self.moves < self.dim[0]*self.dim[1]:
             while not (self.finished):
                 try:
-                    self.move(int(input('player 1\'s select row from 0...%i: ' % self.dim[0])), 1)
+                    self.move(int(input('player\'s turn, select row from 0...%i: ' % (self.dim[0] - 1))), 1)
                     self.printState()
                     break
                 except (NameError, ValueError, IndexError):
@@ -110,18 +110,19 @@ class agent:
     def __init__(self, layer, board):
         layer = np.concatenate(([board.dim[0] * board.dim[1]], layer, [board.dim[0]]))
         self.w = np.array([np.random.rand(layer[i], layer[i+1])*2-1 for i in range(len(layer)-1)])
-        self.findwtot()
-
-    def findwtot(self):
-        self.wtot = self.w[0]
-        for i in range(len(self.w)-1):
-            self.wtot = np.dot(self.wtot, self.w[i+1])
 
     def makeMove(self, board):
-        prob = 1/(1+np.exp(-1*np.dot(board.state.reshape(board.dim[0]*board.dim[1]), self.wtot)))
+        if np.count_nonzero(board.state) == 0:
+            return(np.random.choice(board.dim[0]))
+        prob = np.maximum(np.dot(board.state.flatten(), self.w[0]), 0)
+        for i in range(1, len(self.w)):
+            prob = np.maximum(np.dot(prob, self.w[i]), 0)
         prob[np.nonzero(board.state[:, -1])] = 0
-        prob = prob/np.sum(prob)
-        return(np.random.choice(board.dim[0],  p=prob))
+        if np.sum(prob) != 0:
+            prob = prob/np.sum(prob)
+            return(np.random.choice(board.dim[0],  p=prob))
+        else:
+            return(np.random.choice(np.arange(board.dim[0])[board.state[:, -1] == 0]))
 
     def mutate(self, prob):
         for each in range(len(self.w)):
@@ -130,46 +131,48 @@ class agent:
                 if np.random.rand() < prob:
                     temp[i] = (np.random.rand())
             self.w[each] = temp.reshape(self.w[each].shape)
-        self.findwtot()
 
 
 def compete(agents):
     ret = np.zeros(len(agents))
     for i in range(len(agents)):
         [a1, a2] = agents[i]
-        if not np.array_equal(a1.wtot.sum(), a2.wtot.sum()):
+        if not np.array_equal(a1.w[0], a2.w[0]):
             for trials in range(3):
                 ret[i] += board_1.playAvA(a1, a2)
     return(ret)
 
 
 def generation(mutateProb, scoreSort, agentArr):
+    print([[i, j] for i in range(10) for j in range(i)])
     agentPairs = np.array([[agentArr[scoreSort[i]], agentArr[scoreSort[j]]]
                            for i in range(len(scoreSort)) for j in range(i)])
+    print(len(agentPairs))
     for pair in range(len(agentPairs)):
         [a1, a2] = agentPairs[pair]
-        if not np.array_equal(a1.wtot.sum(), a2.wtot.sum()):
+        if np.random.rand() < 0.05:
+            a1 = np.random.choice(agentArr)
+        if not (np.array_equal(a1.w[0], a2.w[0]) and np.array_equal(a1.w[1], a2.w[1])):
             for i in range(len(a1.w)):
                 a1.w[i] = (a1.w[i] + a2.w[i]) / 2
-                a1.findwtot()
-            a1.mutate(mutateProb)
+        a1.mutate(mutateProb)
         agentArr[pair] = a1
     return(agentArr)
 
 
 board_1 = board()
-a = 45
+a = 105
 t0 = time.clock()
 agentArr = [agent([8], board_1) for i in range(a)]
 p = mp.Pool(a)
 for gens in range(30):
-    mutateProb = 1 / (1+gens)
+    mutateProb = 1 / 20
     print(gens)
     agentScore = np.zeros(a)
     agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
     out = np.array(p.map(compete, agentMat))
     agentScore = out.sum(axis=0) - out.sum(axis=1)
-    scoreSort = agentScore.argsort()[-10:][::-1]
+    scoreSort = agentScore.argsort()[-15:][::-1]
     agentArr = generation(mutateProb, scoreSort, agentArr)
 t1 = time.clock()
 print(t1 - t0)
