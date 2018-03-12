@@ -149,7 +149,7 @@ def generation(mutateProb, scoreSort, agentArr):
     for pair in range(len(agentPairs)):
         [a1, a2] = agentPairs[pair]
         if np.random.rand() < mutateProb:
-            a1 = agent([8], board_1)
+            a1.w = (agent([8], board_1).w + a1.w) / 2
             break
         if not (np.array_equal(a1.w[0], a2.w[0]) and np.array_equal(a1.w[1], a2.w[1])):
             for i in range(len(a1.w)):
@@ -163,8 +163,8 @@ a = 105
 t0 = time.clock()
 agentArr = [agent([8], board_1) for i in range(a)]
 p = mp.Pool(a)
-for gens in range(30):
-    mutateProb = 1 / (2+gens)
+for gens in range(100):
+    mutateProb = 1 / (5+gens)
     print(gens)
     agentScore = np.zeros(a)
     agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
