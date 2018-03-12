@@ -120,7 +120,7 @@ class agent:
         prob[np.nonzero(board.state[:, -1])] = 0
         if np.sum(prob) != 0:
             prob = prob/np.sum(prob)
-            return(np.random.choice(board.dim[0],  p=prob))
+            return(np.random.choice(board.dim[0], p=prob))
         else:
             return(np.random.choice(np.arange(board.dim[0])[board.state[:, -1] == 0]))
 
@@ -138,24 +138,22 @@ def compete(agents):
     for i in range(len(agents)):
         [a1, a2] = agents[i]
         if not np.array_equal(a1.w[0], a2.w[0]):
-            for trials in range(3):
+            for trials in range(10):
                 ret[i] += board_1.playAvA(a1, a2)
     return(ret)
 
 
 def generation(mutateProb, scoreSort, agentArr):
-    print([[i, j] for i in range(10) for j in range(i)])
     agentPairs = np.array([[agentArr[scoreSort[i]], agentArr[scoreSort[j]]]
                            for i in range(len(scoreSort)) for j in range(i)])
-    print(len(agentPairs))
     for pair in range(len(agentPairs)):
         [a1, a2] = agentPairs[pair]
-        if np.random.rand() < 0.05:
-            a1 = np.random.choice(agentArr)
+        if np.random.rand() < mutateProb:
+            a1 = agent([8], board_1)
+            break
         if not (np.array_equal(a1.w[0], a2.w[0]) and np.array_equal(a1.w[1], a2.w[1])):
             for i in range(len(a1.w)):
                 a1.w[i] = (a1.w[i] + a2.w[i]) / 2
-        a1.mutate(mutateProb)
         agentArr[pair] = a1
     return(agentArr)
 
@@ -166,7 +164,7 @@ t0 = time.clock()
 agentArr = [agent([8], board_1) for i in range(a)]
 p = mp.Pool(a)
 for gens in range(30):
-    mutateProb = 1 / 20
+    mutateProb = 1 / (2+gens)
     print(gens)
     agentScore = np.zeros(a)
     agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
@@ -177,4 +175,5 @@ for gens in range(30):
 t1 = time.clock()
 print(t1 - t0)
 print(agentScore, np.sum(agentScore))
-board_1.playHvA(agentArr[agentScore.argmax()])
+while(True):
+    board_1.playHvA(agentArr[agentScore.argmax()])
