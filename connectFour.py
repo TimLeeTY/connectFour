@@ -112,11 +112,9 @@ class agent:
         self.w = np.array([np.random.rand(layer[i], layer[i+1])*2-1 for i in range(len(layer)-1)])
 
     def makeMove(self, board):
-        if np.count_nonzero(board.state) == 0:
-            return(np.random.choice(board.dim[0]))
-        prob = np.maximum(np.dot(board.state.flatten(), self.w[0]), 0)
-        for i in range(1, len(self.w)):
-            prob = np.maximum(np.dot(prob, self.w[i]), 0)
+        prob = board.state.flatten()
+        for i in range(len(self.w)):
+            prob = 1/(np.exp(-1 * np.dot(prob, self.w[i])) + 1)     # Apply sigmoid
         prob[np.nonzero(board.state[:, -1])] = 0
         if np.sum(prob) != 0:
             prob = prob/np.sum(prob)
@@ -138,7 +136,7 @@ def compete(agents):
     for i in range(len(agents)):
         [a1, a2] = agents[i]
         if not np.array_equal(a1.w[0], a2.w[0]):
-            for trials in range(10):
+            for trials in range(3):
                 ret[i] += board_1.playAvA(a1, a2)
     return(ret)
 
@@ -149,7 +147,7 @@ def generation(mutateProb, scoreSort, agentArr):
     for pair in range(len(agentPairs)):
         [a1, a2] = agentPairs[pair]
         if np.random.rand() < mutateProb:
-            a1 = agent([8], board_1)
+            a1 = agent([10, 7], board_1)
             break
         if not (np.array_equal(a1.w[0], a2.w[0]) and np.array_equal(a1.w[1], a2.w[1])):
             for i in range(len(a1.w)):
@@ -161,14 +159,14 @@ def generation(mutateProb, scoreSort, agentArr):
 board_1 = board()
 a = 105
 t0 = time.clock()
-agentArr = [agent([8], board_1) for i in range(a)]
-p = mp.Pool(a)
+agentArr = [agent([10, 7], board_1) for i in range(a)]
 for gens in range(30):
     mutateProb = 1 / (2+gens)
     print(gens)
     agentScore = np.zeros(a)
     agentMat = [[[agentArr[i], agentArr[j]] for j in range(a)] for i in range(a)]
-    out = np.array(p.map(compete, agentMat))
+    out = np.array(list(map(compete, agentMat)))
+    print(out.shape)
     agentScore = out.sum(axis=0) - out.sum(axis=1)
     scoreSort = agentScore.argsort()[-15:][::-1]
     agentArr = generation(mutateProb, scoreSort, agentArr)
